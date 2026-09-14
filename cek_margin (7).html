@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cek Margin Sebelum Deal</title>
+<style>
+  :root{
+    --navy:#1F3864;
+    --paper:#F7F8FA;
+    --ink:#1B2430;
+    --muted:#5B6472;
+    --line:#DDE2E8;
+    --green-bg:#E9F6ED; --green-line:#3C9A5F; --green-text:#1F6B3B;
+    --amber-bg:#FFF6E0; --amber-line:#C98A12; --amber-text:#8A5A00;
+    --red-bg:#FCEAEA;  --red-line:#C13B3B;  --red-text:#8E1F1F;
+    --grey-bg:#EDEEF1; --grey-line:#8B909A; --grey-text:#4B505A;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--paper); color:var(--ink); min-height:100vh;
+    display:flex; justify-content:center; padding:28px 16px;
+  }
+  .card{
+    width:100%; max-width:460px; background:#fff; border:1px solid var(--line);
+    border-radius:14px; overflow:hidden; box-shadow:0 1px 3px rgba(20,30,50,.06);
+  }
+  .head{ background:var(--navy); color:#fff; padding:22px 22px 20px; }
+  .head h1{margin:0; font-size:19px; font-weight:700; letter-spacing:.1px;}
+  .head p{margin:6px 0 0; font-size:13px; color:#C7D2E6; line-height:1.5;}
+  .body{padding:22px;}
+  label{ display:block; font-size:13px; font-weight:600; color:var(--ink); margin:0 0 6px; }
+  .field{margin-bottom:16px;}
+  .field.sub{
+    margin:-4px 0 16px 0; padding:14px; background:var(--paper);
+    border:1px solid var(--line); border-radius:10px;
+  }
+  .field.sub label{ margin-bottom:8px; }
+  .field.sub:first-of-type{margin-top:0;}
+  .hint{font-size:12px; color:var(--muted); margin:6px 0 0; line-height:1.5;}
+  .seg{ display:flex; border:1px solid var(--line); border-radius:9px; overflow:hidden; background:#fff; }
+  .seg button{
+    flex:1; padding:11px 8px; border:none; background:#fff; color:var(--muted);
+    font-size:14px; font-weight:600; cursor:pointer; border-right:1px solid var(--line);
+  }
+  .seg button:last-child{border-right:none;}
+  .seg button.active{background:var(--navy); color:#fff;}
+  .inputwrap{position:relative;}
+  .inputwrap span{
+    position:absolute; left:13px; top:50%; transform:translateY(-50%);
+    color:var(--muted); font-size:14px; pointer-events:none;
+  }
+  input[type=text]{
+    width:100%; padding:12px 13px 12px 34px; border:1px solid var(--line);
+    border-radius:9px; font-size:15px; font-weight:600; color:var(--ink);
+    background:#fff; outline:none;
+  }
+  input[type=text]:focus{border-color:var(--navy);}
+  .result{
+    margin-top:6px; border-radius:11px; padding:18px; border:1.5px solid var(--line);
+    background:var(--grey-bg); transition:background .15s, border-color .15s;
+  }
+  .result .status{
+    display:flex; align-items:center; gap:9px; font-size:16px; font-weight:700; margin-bottom:6px;
+  }
+  .dot{width:11px; height:11px; border-radius:50%; flex-shrink:0;}
+  .result .margin-num{font-size:29px; font-weight:800; letter-spacing:-.5px; margin:2px 0 6px;}
+  .result .margin-sub{font-size:12px; font-weight:600; opacity:.7; letter-spacing:0;}
+  .result .desc{font-size:13.5px; line-height:1.55; margin:0;}
+  .totals{ margin-top:14px; padding-top:14px; border-top:1px solid rgba(0,0,0,.08); }
+  .totals-row{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:13px; padding:3px 0; opacity:.85;
+  }
+  .totals-row b{font-size:13.5px; font-weight:700;}
+  .totals-row.highlight{
+    margin-top:4px; padding-top:8px; border-top:1px dashed rgba(0,0,0,.12); opacity:1;
+  }
+  .totals-row.highlight span{font-weight:700;}
+  .totals-row.highlight b{font-size:16.5px;}
+  .qty-hint{font-size:12.5px; opacity:.65; margin:0;}
+  .placeholder{ color:var(--muted); font-size:13.5px; text-align:center; padding:6px 0; }
+  .thresholds{
+    margin-top:16px; padding-top:14px; border-top:1px dashed var(--line);
+    font-size:12px; color:var(--muted); line-height:1.7;
+  }
+  .thresholds b{color:var(--ink);}
+  #saveBtn{
+    width:100%; margin-top:14px; padding:13px; border:none; border-radius:9px;
+    background:var(--navy); color:#fff; font-size:14.5px; font-weight:700;
+    cursor:pointer;
+  }
+  #saveBtn:disabled{ background:#B7BFCC; cursor:not-allowed; }
+  #saveStatus{ text-align:center; margin-top:8px; min-height:16px; }
+  footer{ text-align:center; font-size:11px; color:var(--muted); padding:14px 22px 20px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="head">
+    <h1>Cek Margin Sebelum Deal</h1>
+    <p>Isi sebelum menyepakati harga ke konsumen — hasil langsung menentukan apakah bisa lanjut atau perlu izin Finance dulu.</p>
+  </div>
+  <div class="body">
+    <div class="field">
+      <label>Lini Bisnis</label>
+      <div class="seg" id="lini">
+        <button data-v="bbi" class="active">PT BBI</button>
+        <button data-v="risepack">Risepack Food</button>
+      </div>
+    </div>
+
+    <div class="field sub" id="produksiField">
+      <label>Tempat Produksi</label>
+      <div class="seg" id="produksi">
+        <button data-v="workshop" class="active">Workshop</button>
+        <button data-v="vendor">Full Vendor</button>
+      </div>
+      <p class="hint" id="produksiHint"></p>
+    </div>
+
+    <div class="field sub" id="vendorTerminField">
+      <label>Termin ke Vendor/Supplier</label>
+      <div class="seg" id="vendorTermin">
+        <button data-v="cod" class="active">COD</button>
+        <button data-v="top">TOP</button>
+      </div>
+      <p class="hint">Termin pembayaran ke vendor/supplier — bukan ke konsumen.</p>
+    </div>
+
+    <div class="field sub" id="dpField">
+      <label>DP dari Konsumen 50%?</label>
+      <div class="seg" id="dp">
+        <button data-v="ya" class="active">Ya, 50%</button>
+        <button data-v="tidak">Tidak / Kurang</button>
+      </div>
+      <p class="hint" id="dpHint"></p>
+    </div>
+
+    <div class="field">
+      <label for="sales">Nama Sales</label>
+      <input type="text" id="sales" placeholder="cth. Budi">
+    </div>
+    <div class="field">
+      <label for="konsumen">Nama Konsumen / Kode Order (opsional)</label>
+      <input type="text" id="konsumen" placeholder="cth. CV Sinar Jaya / ORD-0231">
+    </div>
+    <div class="field">
+      <label>Pelunasan Konsumen</label>
+      <div class="seg" id="pelunasan">
+        <button data-v="cod" class="active">COD</button>
+        <button data-v="top">TOP</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="hpp">HPP / Modal per Unit (Rp)</label>
+      <div class="inputwrap">
+        <span>Rp</span>
+        <input type="text" id="hpp" inputmode="numeric" placeholder="cth. 8.000.000">
+      </div>
+    </div>
+    <div class="field">
+      <label for="harga">Harga per Unit yang Akan Ditawarkan (Rp)</label>
+      <div class="inputwrap">
+        <span>Rp</span>
+        <input type="text" id="harga" inputmode="numeric" placeholder="cth. 10.500.000">
+      </div>
+    </div>
+    <div class="field">
+      <label for="qty">Jumlah / Quantity</label>
+      <div class="inputwrap">
+        <span>Qty</span>
+        <input type="text" id="qty" inputmode="numeric" placeholder="cth. 25" style="padding-left:52px;">
+      </div>
+    </div>
+
+    <div class="result" id="result">
+      <p class="placeholder">Isi semua data, lalu klik "Cek" untuk melihat status.</p>
+    </div>
+
+    <button id="saveBtn" type="button">Cek</button>
+    <p class="hint" id="saveStatus"></p>
+
+    <div class="thresholds" id="thresholds"></div>
+  </div>
+  <footer>Basis perhitungan: nilai PO, bukan Invoice.</footer>
+</div>
+
+<script>
+  // ============================================================
+  // ATURAN MARGIN
+  //
+  // RISEPACK FOOD:
+  //   margin < 12%           -> MERAH, wajib CBD, tidak ada syarat lain yang menyelamatkan.
+  //   12% <= margin < 18%    -> HIJAU hanya jika DP konsumen 50% DAN termin ke vendor TOP.
+  //                             Kalau salah satu/kedua syarat itu tidak terpenuhi -> KUNING.
+  //   margin >= 18%          -> HIJAU langsung.
+  //   margin > 30%           -> ABU-ABU (kemungkinan salah input, cek ulang).
+  //
+  // PT BBI:
+  //   Workshop + Pelunasan TOP  -> selalu MERAH (kombinasi tidak valid; workshop wajib COD).
+  //   Workshop (pelunasan COD):
+  //     margin >= 20% DAN DP 50% -> HIJAU
+  //     selain itu                -> MERAH
+  //   Full Vendor:
+  //     margin >= 20%                       -> HIJAU (berapapun status DP)
+  //     margin 17%-<20% DAN DP 50%          -> HIJAU
+  //     margin 16%-<20% (tanpa salvage di atas) -> KUNING
+  //     margin < 16%                        -> MERAH
+  //   margin > 35% (BBI)          -> ABU-ABU (kemungkinan salah input, cek ulang).
+  // ============================================================
+  const RULES = {
+    risepack: { name: "Risepack Food", floor: 12, green: 18, high: 30 },
+    bbi: {
+      name: "PT BBI",
+      workshop: { green: 20, high: 35 },
+      vendor:   { greenNormal: 20, greenWithDp: 17, amberFloor: 16, high: 35 }
+    }
+  };
+
+  let lini = "bbi";
+  let produksi = "workshop";
+  let dpOk = true;
+  let vendorTermin = "cod";
+
+  const liniBtns = document.querySelectorAll("#lini button");
+  const produksiBtns = document.querySelectorAll("#produksi button");
+  const dpBtns = document.querySelectorAll("#dp button");
+  const vendorTerminBtns = document.querySelectorAll("#vendorTermin button");
+  const produksiField = document.getElementById("produksiField");
+  const dpField = document.getElementById("dpField");
+  const dpHint = document.getElementById("dpHint");
+  const vendorTerminField = document.getElementById("vendorTerminField");
+  const produksiHint = document.getElementById("produksiHint");
+
+  // === GANTI DENGAN URL WEB APP GOOGLE APPS SCRIPT KAMU (lihat panduan setup) ===
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw3i_CRAsUjLS62yVGF3LnsKJQe42O5JrVMZyX6bU4u6lMAhkVGfnR-Psjq98iqdgI/exec";
+
+  const salesInput = document.getElementById("sales");
+  const konsumenInput = document.getElementById("konsumen");
+  const pelunasanBtns = document.querySelectorAll("#pelunasan button");
+  let pelunasan = "cod";
+  const saveBtn = document.getElementById("saveBtn");
+  const saveStatus = document.getElementById("saveStatus");
+  let lastPayload = null;
+
+  const hppInput = document.getElementById("hpp");
+  const hargaInput = document.getElementById("harga");
+  const qtyInput = document.getElementById("qty");
+  const resultEl = document.getElementById("result");
+  const thresholdsEl = document.getElementById("thresholds");
+
+  // Hasil tidak lagi muncul otomatis saat mengetik/memilih opsi.
+  // Semua interaksi di bawah ini hanya mengubah state & tampilan pilihan;
+  // perhitungan & tampilan hasil baru jalan saat tombol "Cek Margin" diklik.
+  function resetResultIfChanged(){
+    if (lastPayload){
+      lastPayload = null;
+      resultEl.style.background = "var(--grey-bg)";
+      resultEl.style.borderColor = "var(--line)";
+      resultEl.innerHTML = `<p class="placeholder">Data diubah — klik "Cek" lagi untuk melihat status terbaru.</p>`;
+      saveStatus.textContent = "";
+    }
+  }
+
+  function formatNumberInput(el){
+    el.addEventListener("input", () => {
+      let digits = el.value.replace(/[^\d]/g, "");
+      el.value = digits ? Number(digits).toLocaleString("id-ID") : "";
+      resetResultIfChanged();
+    });
+  }
+  formatNumberInput(hppInput);
+  formatNumberInput(hargaInput);
+  formatNumberInput(qtyInput);
+  salesInput.addEventListener("input", resetResultIfChanged);
+  konsumenInput.addEventListener("input", resetResultIfChanged);
+  pelunasanBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      pelunasanBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      pelunasan = btn.dataset.v;
+      resetResultIfChanged();
+    });
+  });
+
+  vendorTerminBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      vendorTerminBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      vendorTermin = btn.dataset.v;
+      resetResultIfChanged();
+    });
+  });
+
+  liniBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      liniBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      lini = btn.dataset.v;
+      updateVisibility();
+      renderThresholds();
+      resetResultIfChanged();
+    });
+  });
+
+  produksiBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      produksiBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      produksi = btn.dataset.v;
+      updateVisibility();
+      renderThresholds();
+      resetResultIfChanged();
+    });
+  });
+
+  dpBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      dpBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      dpOk = btn.dataset.v === "ya";
+      resetResultIfChanged();
+    });
+  });
+
+  function currentBbiRule(){
+    return RULES.bbi[produksi];
+  }
+
+  function updateVisibility(){
+    const isBbi = lini === "bbi";
+    produksiField.style.display = isBbi ? "block" : "none";
+    vendorTerminField.style.display = isBbi ? "none" : "block";
+    dpField.style.display = "block"; // DP konsumen kini relevan untuk kedua lini bisnis
+    dpHint.textContent = isBbi
+      ? "Wajib DP 50% untuk produksi Workshop. Untuk Full Vendor, DP 50% bisa menurunkan ambang margin hijau."
+      : "DP 50% dari konsumen bisa membantu margin 12%\u201318% tetap hijau, asal termin ke vendor juga TOP.";
+    if (isBbi){
+      produksiHint.textContent = produksi === "workshop"
+        ? "Workshop butuh modal di depan → wajib COD ke konsumen & DP 50%."
+        : "Full vendor tidak butuh modal di depan → ambang margin boleh lebih rendah, apalagi kalau DP 50%.";
+    }
+  }
+
+  function renderThresholds(){
+    if (lini === "risepack"){
+      const r = RULES.risepack;
+      thresholdsEl.innerHTML =
+        `<b>${r.name}</b> — merah &lt; ${r.floor}% (wajib CBD, tanpa pengecualian) &middot; ` +
+        `${r.floor}%&ndash;${r.green}% hijau kalau DP 50% + termin vendor TOP (kalau tidak, kuning) &middot; ` +
+        `hijau &gt; ${r.green}% &middot; di atas ${r.high}% dicek ulang input.`;
+      return;
+    }
+    if (produksi === "workshop"){
+      const r = RULES.bbi.workshop;
+      thresholdsEl.innerHTML =
+        `<b>PT BBI — Workshop</b> — wajib COD ke konsumen (TOP = tidak valid) &middot; ` +
+        `hijau kalau margin &ge; ${r.green}% DAN DP 50% &middot; selain itu merah.`;
+      return;
+    }
+    const r = RULES.bbi.vendor;
+    thresholdsEl.innerHTML =
+      `<b>PT BBI — Full Vendor</b> — hijau &ge; ${r.greenNormal}% &middot; ` +
+      `hijau juga di ${r.greenWithDp}%&ndash;${r.greenNormal}% kalau DP 50% &middot; ` +
+      `kuning ${r.amberFloor}%&ndash;${r.greenNormal}% (tanpa DP) &middot; merah &lt; ${r.amberFloor}%.`;
+  }
+
+  function toNumber(str){
+    const digits = str.replace(/[^\d]/g, "");
+    return digits ? parseInt(digits, 10) : NaN;
+  }
+
+  function formatRupiah(n){
+    return "Rp " + Math.round(n).toLocaleString("id-ID");
+  }
+
+  function compute(){
+    const hpp = toNumber(hppInput.value);
+    const harga = toNumber(hargaInput.value);
+    const qtyRaw = toNumber(qtyInput.value);
+    const qty = qtyRaw && qtyRaw > 0 ? qtyRaw : 1;
+
+    if (!hpp || !harga || hpp <= 0 || harga <= 0){
+      resultEl.style.background = "var(--grey-bg)";
+      resultEl.style.borderColor = "var(--line)";
+      resultEl.innerHTML = `<p class="placeholder">Isi HPP dan harga tawaran, lalu klik tombol lagi.</p>`;
+      lastPayload = null;
+      return;
+    }
+
+    const margin = ((harga - hpp) / harga) * 100;
+    const marginStr = margin.toFixed(1).replace(".", ",") + "%";
+
+    const totalHarga = harga * qty;
+    const totalHpp = hpp * qty;
+    const totalMarginRp = totalHarga - totalHpp;
+    const qtyNote = qtyRaw && qtyRaw > 0
+      ? `<div class="totals">
+           <div class="totals-row"><span>Total Harga (${qty}x)</span><b>${formatRupiah(totalHarga)}</b></div>
+           <div class="totals-row"><span>Total HPP (${qty}x)</span><b>${formatRupiah(totalHpp)}</b></div>
+           <div class="totals-row highlight"><span>Total Margin Keseluruhan</span><b>${formatRupiah(totalMarginRp)}</b></div>
+         </div>`
+      : `<div class="totals"><p class="qty-hint">Isi quantity untuk melihat total margin keseluruhan dalam Rupiah.</p></div>`;
+
+    const label = lini === "risepack" ? RULES.risepack.name : `PT BBI (${produksi === "workshop" ? "Workshop" : "Full Vendor"})`;
+    let bg, line, text, dot, title, desc;
+
+    if (lini === "risepack"){
+      const r = RULES.risepack;
+      const salvage = dpOk && vendorTermin === "top";
+
+      if (margin > r.high){
+        bg = "var(--grey-bg)"; line = "var(--grey-line)"; text = "var(--grey-text)"; dot = "var(--grey-line)";
+        title = "Cek kembali angkanya";
+        desc = `Margin ${marginStr} tergolong sangat tinggi untuk ${label} — kemungkinan HPP atau harga salah input. Periksa ulang sebelum lanjut.`;
+      } else if (margin < r.floor){
+        bg = "var(--red-bg)"; line = "var(--red-line)"; text = "var(--red-text)"; dot = "var(--red-line)";
+        title = "Di bawah batas — jangan deal dulu";
+        desc = `Margin di bawah ${r.floor}% untuk ${label}. Wajib konsumen bayar CBD (Cash Before Delivery) — tidak ada kombinasi DP atau termin vendor yang bisa menyelamatkan margin sekecil ini.`;
+      } else if (margin < r.green){
+        if (salvage){
+          bg = "var(--green-bg)"; line = "var(--green-line)"; text = "var(--green-text)"; dot = "var(--green-line)";
+          title = "Aman, boleh dilanjutkan";
+          desc = `Margin ${marginStr} di zona ${r.floor}%\u2013${r.green}%, tapi tetap hijau karena DP konsumen sudah 50% dan termin ke vendor TOP.`;
+        } else {
+          bg = "var(--amber-bg)"; line = "var(--amber-line)"; text = "var(--amber-text)"; dot = "var(--amber-line)";
+          title = "Perlu perhatian";
+          desc = `Margin ${marginStr} ada di zona ${r.floor}%\u2013${r.green}%. Supaya hijau, butuh DP konsumen 50% DAN termin ke vendor TOP sekaligus — saat ini belum keduanya terpenuhi.`;
+        }
+      } else {
+        bg = "var(--green-bg)"; line = "var(--green-line)"; text = "var(--green-text)"; dot = "var(--green-line)";
+        title = "Aman, boleh dilanjutkan";
+        desc = `Margin sesuai rentang normal ${label}. Bisa langsung disampaikan ke konsumen.`;
+      }
+    } else {
+      // PT BBI
+      const invalidCombo = produksi === "workshop" && pelunasan === "top";
+      const rv = RULES.bbi.vendor;
+      const rw = RULES.bbi.workshop;
+      const highCap = produksi === "workshop" ? rw.high : rv.high;
+
+      if (margin > highCap){
+        bg = "var(--grey-bg)"; line = "var(--grey-line)"; text = "var(--grey-text)"; dot = "var(--grey-line)";
+        title = "Cek kembali angkanya";
+        desc = `Margin ${marginStr} tergolong sangat tinggi untuk ${label} — kemungkinan HPP atau harga salah input. Periksa ulang sebelum lanjut.`;
+      } else if (invalidCombo){
+        bg = "var(--red-bg)"; line = "var(--red-line)"; text = "var(--red-text)"; dot = "var(--red-line)";
+        title = "Kombinasi tidak valid";
+        desc = `Produksi Workshop butuh modal di depan, jadi tidak bisa pakai Pelunasan TOP ke konsumen. Ubah ke Full Vendor, atau ubah Pelunasan ke COD.`;
+      } else if (produksi === "workshop"){
+        if (margin >= rw.green && dpOk){
+          bg = "var(--green-bg)"; line = "var(--green-line)"; text = "var(--green-text)"; dot = "var(--green-line)";
+          title = "Aman, boleh dilanjutkan";
+          desc = `Margin ${marginStr} memenuhi syarat Workshop (\u2265${rw.green}%) dan DP konsumen sudah 50%. Bisa langsung disampaikan ke konsumen.`;
+        } else {
+          bg = "var(--red-bg)"; line = "var(--red-line)"; text = "var(--red-text)"; dot = "var(--red-line)";
+          title = "Di bawah batas — jangan deal dulu";
+          desc = margin < rw.green
+            ? `Margin di bawah ${rw.green}% untuk produksi Workshop. Workshop wajib margin minimal ${rw.green}% plus DP 50%, karena modal keluar duluan.`
+            : `DP konsumen belum 50% untuk produksi Workshop. Walaupun margin (${marginStr}) memenuhi, tetap wajib DP 50% dulu karena modal keluar di depan.`;
+        }
+      } else {
+        // Full Vendor
+        if (margin >= rv.greenNormal){
+          bg = "var(--green-bg)"; line = "var(--green-line)"; text = "var(--green-text)"; dot = "var(--green-line)";
+          title = "Aman, boleh dilanjutkan";
+          desc = `Margin ${marginStr} di atas ${rv.greenNormal}% untuk Full Vendor. Aman dilanjutkan berapapun status DP.`;
+        } else if (dpOk && margin >= rv.greenWithDp){
+          bg = "var(--green-bg)"; line = "var(--green-line)"; text = "var(--green-text)"; dot = "var(--green-line)";
+          title = "Aman, boleh dilanjutkan";
+          desc = `Margin ${marginStr} di bawah ${rv.greenNormal}%, tapi tetap hijau karena DP konsumen 50% (minimal ${rv.greenWithDp}% untuk Full Vendor + DP 50%).`;
+        } else if (margin >= rv.amberFloor){
+          bg = "var(--amber-bg)"; line = "var(--amber-line)"; text = "var(--amber-text)"; dot = "var(--amber-line)";
+          title = "Perlu perhatian";
+          desc = `Margin ${marginStr} ada di zona sempit (${rv.amberFloor}%\u2013${rv.greenNormal}%) untuk Full Vendor. Boleh lanjut, tapi pertimbangkan konfirmasi ke atasan kalau nilai order besar. Kalau konsumen bisa DP 50% dan margin \u2265${rv.greenWithDp}%, ini bisa hijau.`;
+        } else {
+          bg = "var(--red-bg)"; line = "var(--red-line)"; text = "var(--red-text)"; dot = "var(--red-line)";
+          title = "Di bawah batas — jangan deal dulu";
+          desc = `Margin di bawah ${rv.amberFloor}% untuk Full Vendor. Wajib minta persetujuan Finance sebelum harga ini disampaikan ke konsumen.`;
+        }
+      }
+    }
+
+    resultEl.style.background = bg;
+    resultEl.style.borderColor = line;
+    resultEl.innerHTML = `
+      <div class="status" style="color:${text}"><span class="dot" style="background:${dot}"></span>${title}</div>
+      <div class="margin-num" style="color:${text}">${marginStr} <span class="margin-sub">per unit</span></div>
+      <p class="desc" style="color:${text}">${desc}</p>
+      ${qtyNote}
+    `;
+
+    saveBtn.disabled = false;
+    lastPayload = {
+      timestamp: new Date().toISOString(),
+      sales: salesInput.value || "-",
+      konsumen: konsumenInput.value || "-",
+      pelunasan: pelunasan === "top" ? "TOP" : "COD",
+      lini: label,
+      dp: dpOk ? "50%" : "Tidak 50%",
+      vendorTermin: lini === "risepack" ? (vendorTermin === "top" ? "TOP" : "COD") : "-",
+      hpp: hpp,
+      harga: harga,
+      qty: qty,
+      marginPercent: Number(margin.toFixed(1)),
+      totalHarga: totalHarga,
+      totalHpp: totalHpp,
+      totalMarginRp: totalMarginRp,
+      status: title
+    };
+  }
+
+  saveBtn.addEventListener("click", () => {
+    compute(); // hitung & tampilkan status merah/kuning/hijau sekarang
+
+    if (!lastPayload){
+      saveStatus.textContent = "Isi HPP dan harga tawaran dulu, ya.";
+      saveStatus.style.color = "var(--red-line)";
+      return;
+    }
+    if (!SCRIPT_URL || SCRIPT_URL.indexOf("PASTE_URL") === 0){
+      saveStatus.textContent = "Belum terhubung ke spreadsheet — lihat panduan setup.";
+      saveStatus.style.color = "var(--red-line)";
+      return;
+    }
+    saveBtn.disabled = true;
+    saveStatus.textContent = "Menyimpan ke rekap...";
+    saveStatus.style.color = "var(--muted)";
+    fetch(SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(lastPayload)
+    }).then(() => {
+      saveStatus.textContent = "Tersimpan ke rekap ✓";
+      saveStatus.style.color = "var(--green-line)";
+      saveBtn.disabled = false;
+    }).catch(() => {
+      saveStatus.textContent = "Gagal menyimpan — cek koneksi internet.";
+      saveStatus.style.color = "var(--red-line)";
+      saveBtn.disabled = false;
+    });
+  });
+
+  updateVisibility();
+  renderThresholds();
+</script>
+</body>
+</html>
