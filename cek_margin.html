@@ -80,6 +80,12 @@
   .totals-row.highlight span{font-weight:700;}
   .totals-row.highlight b{font-size:16.5px;}
   .qty-hint{font-size:12.5px; opacity:.65; margin:0;}
+  .saran{
+    margin-top:12px; padding:11px 13px; border-radius:9px;
+    background:rgba(255,255,255,.55); border:1px dashed rgba(0,0,0,.18);
+    font-size:12.5px; line-height:1.6; color:inherit;
+  }
+  .saran b{ font-weight:700; }
   .placeholder{ color:var(--muted); font-size:13.5px; text-align:center; padding:6px 0; }
   .thresholds{
     margin-top:16px; padding-top:14px; border-top:1px dashed var(--line);
@@ -251,9 +257,6 @@
   const resultEl = document.getElementById("result");
   const thresholdsEl = document.getElementById("thresholds");
 
-  // Hasil tidak lagi muncul otomatis saat mengetik/memilih opsi.
-  // Semua interaksi di bawah ini hanya mengubah state & tampilan pilihan;
-  // perhitungan & tampilan hasil baru jalan saat tombol "Cek Margin" diklik.
   function resetResultIfChanged(){
     if (lastPayload){
       lastPayload = null;
@@ -333,7 +336,7 @@
     const isBbi = lini === "bbi";
     produksiField.style.display = isBbi ? "block" : "none";
     vendorTerminField.style.display = isBbi ? "none" : "block";
-    dpField.style.display = "block"; // DP konsumen kini relevan untuk kedua lini bisnis
+    dpField.style.display = "block";
     dpHint.textContent = isBbi
       ? "Wajib DP 50% untuk produksi Workshop. Untuk Full Vendor, DP 50% bisa menurunkan ambang margin hijau."
       : "DP 50% dari konsumen bisa membantu margin 12%\u201318% tetap hijau, asal termin ke vendor juga TOP.";
@@ -376,6 +379,18 @@
     return "Rp " + Math.round(n).toLocaleString("id-ID");
   }
 
+  function minPriceForMargin(hpp, marginPercent){
+    const raw = hpp / (1 - marginPercent / 100);
+    let step;
+    if (raw >= 1000000) step = 1000;
+    else if (raw >= 100000) step = 500;
+    else if (raw >= 10000) step = 100;
+    else if (raw >= 1000) step = 50;
+    else if (raw >= 100) step = 5;
+    else step = 1;
+    return Math.ceil(raw / step) * step;
+  }
+
   function compute(){
     const hpp = toNumber(hppInput.value);
     const harga = toNumber(hargaInput.value);
@@ -405,7 +420,7 @@
       : `<div class="totals"><p class="qty-hint">Isi quantity untuk melihat total margin keseluruhan dalam Rupiah.</p></div>`;
 
     const label = lini === "risepack" ? RULES.risepack.name : `PT BBI (${produksi === "workshop" ? "Workshop" : "Full Vendor"})`;
-    let bg, line, text, dot, title, desc;
+    let bg, line, text, dot, title, desc, saran = "";
 
     if (lini === "risepack"){
       const r = RULES.risepack;
@@ -419,6 +434,9 @@
         bg = "var(--red-bg)"; line = "var(--red-line)"; text = "var(--red-text)"; dot = "var(--red-line)";
         title = "Di bawah batas — jangan deal dulu";
         desc = `Margin di bawah ${r.floor}% untuk ${label}. Wajib konsumen bayar CBD (Cash Before Delivery) — tidak ada kombinasi DP atau termin vendor yang bisa menyelamatkan margin sekecil ini.`;
+        const targetGreen = minPriceForMargin(hpp, r.green);
+        const targetFloor = minPriceForMargin(hpp, r.floor);
+        saran = `Naikkan harga ke minimal <b>${formatRupiah(targetGreen)}</b> per unit supaya langsung hijau (margin ${r.green}%) tanpa syarat tambahan. Kalau cuma bisa naik ke <b>${formatRupiah(targetFloor)}</b> (margin ${r.floor}%), masih perlu DP 50% + termin vendor TOP supaya hijau.`;
       } else if (margin < r.green){
         if (salvage){
           bg = "var(--green-bg)"; line = "var(--green-line)"; text = "var(--green-text)"; dot = "var(--green-line)";
@@ -428,6 +446,8 @@
           bg = "var(--amber-bg)"; line = "var(--amber-line)"; text = "var(--amber-text)"; dot = "var(--amber-line)";
           title = "Perlu perhatian";
           desc = `Margin ${marginStr} ada di zona ${r.floor}%\u2013${r.green}%. Supaya hijau, butuh DP konsumen 50% DAN termin ke vendor TOP sekaligus — saat ini belum keduanya terpenuhi.`;
+          const targetGreen = minPriceForMargin(hpp, r.green);
+          saran = `Naikkan harga ke minimal <b>${formatRupiah(targetGreen)}</b> per unit supaya otomatis hijau tanpa syarat tambahan. Atau, kalau harga tetap segini, pastikan dulu DP konsumen 50% dan termin ke vendor TOP.`;
         }
       } else {
         bg = "var(--green-bg)"; line = "var(--green-line)"; text = "var(--green-text)"; dot = "var(--green-line)";
@@ -435,7 +455,6 @@
         desc = `Margin sesuai rentang normal ${label}. Bisa langsung disampaikan ke konsumen.`;
       }
     } else {
-      // PT BBI
       const invalidCombo = produksi === "workshop" && pelunasan === "top";
       const rv = RULES.bbi.vendor;
       const rw = RULES.bbi.workshop;
@@ -457,12 +476,16 @@
         } else {
           bg = "var(--red-bg)"; line = "var(--red-line)"; text = "var(--red-text)"; dot = "var(--red-line)";
           title = "Di bawah batas — jangan deal dulu";
-          desc = margin < rw.green
-            ? `Margin di bawah ${rw.green}% untuk produksi Workshop. Workshop wajib margin minimal ${rw.green}% plus DP 50%, karena modal keluar duluan.`
-            : `DP konsumen belum 50% untuk produksi Workshop. Walaupun margin (${marginStr}) memenuhi, tetap wajib DP 50% dulu karena modal keluar di depan.`;
+          if (margin < rw.green){
+            desc = `Margin di bawah ${rw.green}% untuk produksi Workshop. Workshop wajib margin minimal ${rw.green}% plus DP 50%, karena modal keluar duluan.`;
+            const targetGreen = minPriceForMargin(hpp, rw.green);
+            saran = `Naikkan harga ke minimal <b>${formatRupiah(targetGreen)}</b> per unit supaya margin capai ${rw.green}%. Jangan lupa DP konsumen tetap wajib 50%.`;
+          } else {
+            desc = `DP konsumen belum 50% untuk produksi Workshop. Walaupun margin (${marginStr}) memenuhi, tetap wajib DP 50% dulu karena modal keluar di depan.`;
+            saran = `Margin sudah cukup — tinggal pastikan DP konsumen 50% sebelum harga ini disampaikan.`;
+          }
         }
       } else {
-        // Full Vendor
         if (margin >= rv.greenNormal){
           bg = "var(--green-bg)"; line = "var(--green-line)"; text = "var(--green-text)"; dot = "var(--green-line)";
           title = "Aman, boleh dilanjutkan";
@@ -475,13 +498,29 @@
           bg = "var(--amber-bg)"; line = "var(--amber-line)"; text = "var(--amber-text)"; dot = "var(--amber-line)";
           title = "Perlu perhatian";
           desc = `Margin ${marginStr} ada di zona sempit (${rv.amberFloor}%\u2013${rv.greenNormal}%) untuk Full Vendor. Boleh lanjut, tapi pertimbangkan konfirmasi ke atasan kalau nilai order besar. Kalau konsumen bisa DP 50% dan margin \u2265${rv.greenWithDp}%, ini bisa hijau.`;
+          if (dpOk){
+            const targetGreenWithDp = minPriceForMargin(hpp, rv.greenWithDp);
+            saran = `DP sudah 50% — tinggal naikkan harga ke minimal <b>${formatRupiah(targetGreenWithDp)}</b> per unit (margin ${rv.greenWithDp}%) supaya hijau.`;
+          } else {
+            const targetGreenNormal = minPriceForMargin(hpp, rv.greenNormal);
+            const targetGreenWithDp = minPriceForMargin(hpp, rv.greenWithDp);
+            saran = `Naikkan harga ke minimal <b>${formatRupiah(targetGreenNormal)}</b> (margin ${rv.greenNormal}%) supaya aman tanpa syarat. Atau naikkan ke <b>${formatRupiah(targetGreenWithDp)}</b> (margin ${rv.greenWithDp}%) DAN dapatkan DP 50% dari konsumen — itu juga sudah hijau.`;
+          }
         } else {
           bg = "var(--red-bg)"; line = "var(--red-line)"; text = "var(--red-text)"; dot = "var(--red-line)";
           title = "Di bawah batas — jangan deal dulu";
           desc = `Margin di bawah ${rv.amberFloor}% untuk Full Vendor. Wajib minta persetujuan Finance sebelum harga ini disampaikan ke konsumen.`;
+          const targetGreenNormal = minPriceForMargin(hpp, rv.greenNormal);
+          const targetGreenWithDp = minPriceForMargin(hpp, rv.greenWithDp);
+          const targetFloor = minPriceForMargin(hpp, rv.amberFloor);
+          saran = `Idealnya naikkan harga ke minimal <b>${formatRupiah(targetGreenNormal)}</b> per unit (margin ${rv.greenNormal}%) supaya aman tanpa syarat. Kalau konsumen bisa DP 50%, cukup naikkan ke <b>${formatRupiah(targetGreenWithDp)}</b> (margin ${rv.greenWithDp}%). Kalau kedua itu tidak memungkinkan, minta naik <b>setidaknya ke ${formatRupiah(targetFloor)}</b> (margin ${rv.amberFloor}%) — ini batas minimal mutlak, tetap butuh persetujuan Finance tapi jangan sampai di bawah ini.`;
         }
       }
     }
+
+    const saranBlock = saran
+      ? `<div class="saran"><b>💡 Saran:</b> ${saran}</div>`
+      : "";
 
     resultEl.style.background = bg;
     resultEl.style.borderColor = line;
@@ -489,6 +528,7 @@
       <div class="status" style="color:${text}"><span class="dot" style="background:${dot}"></span>${title}</div>
       <div class="margin-num" style="color:${text}">${marginStr} <span class="margin-sub">per unit</span></div>
       <p class="desc" style="color:${text}">${desc}</p>
+      ${saranBlock}
       ${qtyNote}
     `;
 
@@ -513,7 +553,7 @@
   }
 
   saveBtn.addEventListener("click", () => {
-    compute(); // hitung & tampilkan status merah/kuning/hijau sekarang
+    compute();
 
     if (!lastPayload){
       saveStatus.textContent = "Isi HPP dan harga tawaran dulu, ya.";
